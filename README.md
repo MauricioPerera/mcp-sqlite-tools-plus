@@ -45,9 +45,20 @@ by the server, not improvised by the model.
 - A package manager. `pnpm` is recommended (the repo pins it via `packageManager`),
   but `npm` works too.
 
-## Installation (from source)
+## Installation
 
-This fork is distributed as source. Clone, install and build:
+### Option A — npm (recommended)
+
+The package is published on npm as
+[`mcp-sqlite-tools-plus`](https://www.npmjs.com/package/mcp-sqlite-tools-plus).
+No clone or build needed — your MCP client runs it via `npx` (see Configuration).
+To try it standalone:
+
+```bash
+npx -y mcp-sqlite-tools-plus
+```
+
+### Option B — from source
 
 ```bash
 git clone https://github.com/MauricioPerera/mcp-sqlite-tools-plus.git
@@ -68,14 +79,16 @@ The built entry point is `dist/index.js`.
 ## Configuration
 
 Add the server to your MCP client. Example for **Claude Desktop**
-(`claude_desktop_config.json`):
+(`claude_desktop_config.json`).
+
+**Using npm (Option A):**
 
 ```json
 {
   "mcpServers": {
     "sqlite": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-sqlite-tools-plus/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "mcp-sqlite-tools-plus"],
       "env": {
         "SQLITE_DEFAULT_PATH": "/absolute/path/to/your/databases",
         "SQLITE_ALLOW_ABSOLUTE_PATHS": "false",
@@ -87,6 +100,13 @@ Add the server to your MCP client. Example for **Claude Desktop**
   }
 }
 ```
+
+> On Windows, if `npx` is not picked up directly, use
+> `"command": "cmd"` with `"args": ["/c", "npx", "-y", "mcp-sqlite-tools-plus"]`.
+
+**From source (Option B):** set `"command": "node"` and
+`"args": ["/absolute/path/to/mcp-sqlite-tools-plus/dist/index.js"]`, keeping the
+same `env` block.
 
 > Replace the `/absolute/path/...` placeholders with paths on your machine. Restart
 > the MCP client after editing its config.
