@@ -1,0 +1,167 @@
+# mcp-sqlite-tools-plus
+
+## 0.1.0
+
+Fork of `mcp-sqlite-tools` by Scott Spence.
+
+### Minor Changes
+
+- Add JSON import/export tools: `import_json`, `export_json`.
+- Add XLSX import/export tools: `import_xlsx`, `export_xlsx` (via `exceljs`).
+- Extract shared table import/export helpers into `table-io-shared.ts`.
+- Documentation: usage and installation for both users and AI agents, plus
+  hardening guidance (`SQLITE_ALLOW_ABSOLUTE_PATHS=false`, dedicated paths).
+
+---
+
+# mcp-sqlite-tools (upstream)
+
+## 0.0.18
+
+### Patch Changes
+
+- dd25e15: Fix WAL-safe backups and replace misleading max query time
+  with explicit SQLite busy timeout.
+- e057e5e: Add CSV import/export tools with table creation, type
+  coercion, absolute paths, and row error reporting
+- edb51fa: Harden SQLite safety boundaries with readonly enforcement,
+  identifier quoting, schema filter parameterization, and regression
+  tests.
+- 554c936: Migrate build, test, lint, and formatting workflows from
+  TypeScript/Prettier to Vite+ and Vitest.
+- 935c861: Tighten schema import parsing, lifecycle side effects,
+  tool-boundary tests, package metadata, and documentation
+  consistency.
+- 2ef1a9c: Fix CSV option validation to only enforce single-character
+  delimiter, quote, and escape settings.
+- ae6430d: Refactor safety coverage into colocated tests and preserve
+  SQLite query, CSV, schema, config validations.
+- 78f6f01: Improve readonly violation errors with structured guidance
+  and ignore SQLite WAL/SHM sidecar files.
+
+## 0.0.17
+
+### Patch Changes
+
+- 3174a2b: Add `create_database` tool and change `open_database` to
+  only open existing databases
+  - `open_database` no longer silently creates new database files when
+    the path doesn't exist — it now errors, preventing LLMs from
+    accidentally creating empty databases when pointing to wrong paths
+  - New `create_database` tool explicitly creates a new empty
+    database, erroring if the file already exists
+  - This separates intent: use `open_database` for existing databases,
+    `create_database` for new ones
+
+## 0.0.16
+
+### Patch Changes
+
+- 7bae5aa: Auto-invalidate cached connections when database file
+  deleted or modified externally
+
+## 0.0.15
+
+### Patch Changes
+
+- 6708a9f: chore: optimize tool descriptions to reduce context usage
+- b35a0d5: update docs
+
+## 0.0.14
+
+### Patch Changes
+
+- f20105f: remove @valibot/to-json-schema
+
+## 0.0.13
+
+### Patch Changes
+
+- 0114f50: add @valibot/to-json-schema dependency
+
+## 0.0.12
+
+### Patch Changes
+
+- c0ba531: update tool descriptions
+
+## 0.0.11
+
+### Patch Changes
+
+- 65a51a9: set up for mcp registry
+
+## 0.0.10
+
+### Patch Changes
+
+- c2406e8: refactor error and helper functions
+- 3653a99: add bulk insert, transactions, schema export and connection
+  pooling
+- bb6669c: snek case refactor
+- b790a4c: fix parameter binding and add list_databases
+- 06da826: use tmcp in place of @modelcontextprotocol/sdk
+- 94ac60e: add helper functions for response and errors
+
+## 0.0.9
+
+### Patch Changes
+
+- 30ded50: remove static tool definitions to avoid conflicts with
+  dynamic registration
+
+## 0.0.8
+
+### Patch Changes
+
+- 28f3280: enhance tool registration by removing static definitions
+  and updating default value types
+
+## 0.0.7
+
+### Patch Changes
+
+- add shebang
+
+## 0.0.6
+
+### Patch Changes
+
+- make it work 😅 Returns all tools with complete parameter schemas
+  now
+
+## 0.0.5
+
+### Patch Changes
+
+- update dependencies
+
+## 0.0.4
+
+### Patch Changes
+
+- fix: update default SQLite configuration paths for improved
+  usability
+
+## 0.0.3
+
+### Patch Changes
+
+- feat: add pnpm workspace configuration and enhance logging in SQLite
+  Tools MCP server
+
+## 0.0.2
+
+### Patch Changes
+
+- fix: remove duplicate entry of package.json in files array
+
+## 0.0.1
+
+### Patch Changes
+
+- Initial release of MCP SQLite Tools server
+- Support for local SQLite database operations
+- Tools for executing queries, managing tables, and data import/export
+- CSV import and export functionality
+- Comprehensive error handling and validation

@@ -1,0 +1,296 @@
+/**
+ * Query execution tools for the SQLite Tools MCP server
+ */
+import { McpServer } from 'tmcp';
+import * as v from 'valibot';
+import * as sqlite from '../clients/sqlite.js';
+import {
+	ToolUsageError,
+	create_tool_error_response,
+	create_tool_response,
+} from '../common/errors.js';
+import {
+	should_paginate_read_query,
+	trim_trailing_semicolon,
+} from '../common/sql.js';
+import { debug_log } from '../config.js';
+import {
+	resolve_database_name,
+	set_current_database,
+} from './context.js';
+
+// Valid SQLite parameter values
+const SQLiteParamValue = v.union([
+	v.string(),
+	v.number(),
+	v.boolean(),
+	v.null(),
+]);
+
+// Input validation schemas
+const ExecuteQuerySchema = v.object({
+	query: v.pipe(v.string(), v.minLength(1), v.maxLength(10000)),
+	params: v.optional(v.record(v.string(), SQLiteParamValue)),
+	database_name: v.optional(v.pipe(v.string(), v.maxLength(255))),
+});
+
+const ExecuteReadQuerySchema = v.object({
+	query: v.pipe(v.string(), v.minLength(1), v.maxLength(10000)),
+	params: v.optional(v.record(v.string(), SQLiteParamValue)),
+	database_name: v.optional(v.pipe(v.string(), v.maxLength(255))),
+	limit: v.optional(
+		v.pipe(v.number(), v.minValue(1), v.maxValue(50000)),
+		10000,
+	),
+	offset: v.optional(
+		v.pipe(v.number(), v.minValue(0), v.maxValue(1000000)),
+		0,
+	),
+	verbosity: v.optional(
+		v.union([v.literal('summary'), v.literal('detailed')]),
+		'detailed',
+	),
+});
+
+const BulkInsertSchema = v.object({
+	table: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
+	data: v.pipe(
+		v.array(v.record(v.string(), SQLiteParamValue)),
+		v.minLength(1),
+		v.maxLength(10000),
+	),
+	batch_size: v.optional(
+		v.pipe(v.number(), v.minValue(1), v.maxValue(10000)),
+		1000,
+	),
+	database_name: v.optional(v.pipe(v.string(), v.maxLength(255))),
+});
+
+/**
+ * Register query execution tools with the server
+ */
+export function register_query_tools(server: McpServer<any>): void {
+	server.tool<typeof ExecuteReadQuerySchema>(
+		{
+			name: 'execute_read_query',
+			description:
+				'✓ SAFE: Execute read-only SQL (SELECT, PRAGMA, EXPLAIN). Supports parameterized queries. Default limit 10,000 rows. Use verbosity="summary" for counts only.',
+			schema: ExecuteReadQuerySchema,
+		},
+		async ({
+			query,
+			params = {},
+			database_name,
+			limit = 10000,
+			offset = 0,
+			verbosity = 'detailed',
+		}) => {
+			try {
+				debug_log('Executing tool: execute_read_query', {
+					query,
+					params,
+					database_name,
+					limit,
+					offset,
+					verbosity,
+				});
+
+				const database_path = resolve_database_name(database_name);
+				if (database_name) set_current_database(database_name);
+
+				// Validate that this is a read-only query using SQLite's statement metadata.
+				if (!sqlite.is_read_only_query(query, database_path)) {
+					throw new ToolUsageError(
+						'Only SQLite readonly statements are allowed with execute_read_query',
+						[
+							'Use execute_write_query for INSERT, UPDATE, DELETE, or mutating PRAGMA statements',
+							'Use execute_schema_query for CREATE, ALTER, or DROP statements',
+							'Use PRAGMA statements that better-sqlite3 reports as readonly only',
+						],
+					);
+				}
+
+				// Add LIMIT/OFFSET only to SELECT-style queries, not PRAGMA/EXPLAIN.
+				let modified_query = trim_trailing_semicolon(query);
+				if (should_paginate_read_query(modified_query)) {
+					const pagination_clause =
+						offset > 0
+							? `LIMIT ${limit} OFFSET ${offset}`
+							: `LIMIT ${limit}`;
+					modified_query = `${modified_query} ${pagination_clause}`;
+				}
+
+				const result = sqlite.execute_select_query(
+					database_path,
+					modified_query,
+					params,
+				);
+
+				// Format output based on verbosity
+				const response_data =
+					verbosity === 'summary'
+						? {
+								database: database_path,
+								query: modified_query,
+								row_count: result.rows.length,
+								pagination: {
+									limit,
+									offset,
+									returned_count: result.rows.length,
+									has_more: result.rows.length === limit,
+								},
+								verbosity,
+							}
+						: {
+								database: database_path,
+								query: modified_query,
+								result,
+								row_count: result.rows.length,
+								pagination: {
+									limit,
+									offset,
+									returned_count: result.rows.length,
+									has_more: result.rows.length === limit,
+								},
+								verbosity,
+							};
+
+				return create_tool_response(response_data);
+			} catch (error) {
+				return create_tool_error_response(error);
+			}
+		},
+	);
+
+	server.tool<typeof ExecuteQuerySchema>(
+		{
+			name: 'execute_write_query',
+			description:
+				'⚠️ DESTRUCTIVE: Execute data modification SQL (INSERT, UPDATE, DELETE). Supports parameterized queries. Returns affected row count.',
+			schema: ExecuteQuerySchema,
+		},
+		async ({ query, params = {}, database_name }) => {
+			try {
+				debug_log('Executing tool: execute_write_query', {
+					query,
+					params,
+					database_name,
+				});
+
+				const database_path = resolve_database_name(database_name);
+				if (database_name) set_current_database(database_name);
+
+				// Validate that this is not a read-only query and not a schema query
+				if (sqlite.is_read_only_query(query, database_path)) {
+					throw new Error(
+						'SELECT, PRAGMA, and EXPLAIN queries should use execute_read_query',
+					);
+				}
+				if (sqlite.is_schema_query(query)) {
+					throw new Error(
+						'DDL queries (CREATE, ALTER, DROP) should use execute_schema_query',
+					);
+				}
+
+				const result = sqlite.execute_query(
+					database_path,
+					query,
+					params,
+				);
+
+				return create_tool_response({
+					database: database_path,
+					query,
+					result,
+					message: `⚠️ DESTRUCTIVE OPERATION COMPLETED: Data modified in database '${database_path}'. Rows affected: ${result.changes}`,
+				});
+			} catch (error) {
+				return create_tool_error_response(error);
+			}
+		},
+	);
+
+	server.tool<typeof ExecuteQuerySchema>(
+		{
+			name: 'execute_schema_query',
+			description:
+				'⚠️ SCHEMA CHANGE: Execute DDL (CREATE, ALTER, DROP). Modifies database structure. May lock tables.',
+			schema: ExecuteQuerySchema,
+		},
+		async ({ query, params = {}, database_name }) => {
+			try {
+				debug_log('Executing tool: execute_schema_query', {
+					query,
+					params,
+					database_name,
+				});
+
+				const database_path = resolve_database_name(database_name);
+				if (database_name) set_current_database(database_name);
+
+				// Validate that this is a schema query
+				if (!sqlite.is_schema_query(query)) {
+					throw new Error(
+						'Only DDL queries (CREATE, ALTER, DROP) are allowed with execute_schema_query',
+					);
+				}
+
+				const result = sqlite.execute_query(
+					database_path,
+					query,
+					params,
+				);
+
+				return create_tool_response({
+					database: database_path,
+					query,
+					result,
+					message: `⚠️ SCHEMA CHANGE COMPLETED: Database structure modified in '${database_path}'. Changes: ${result.changes}`,
+				});
+			} catch (error) {
+				return create_tool_error_response(error);
+			}
+		},
+	);
+
+	server.tool<typeof BulkInsertSchema>(
+		{
+			name: 'bulk_insert',
+			description:
+				'⚠️ DESTRUCTIVE: Insert multiple records in batches. Default batch size 1000. All records must have identical columns.',
+			schema: BulkInsertSchema,
+		},
+		async ({ table, data, batch_size = 1000, database_name }) => {
+			try {
+				debug_log('Executing tool: bulk_insert', {
+					table,
+					data_count: data.length,
+					batch_size,
+					database_name,
+				});
+
+				const database_path = resolve_database_name(database_name);
+				if (database_name) set_current_database(database_name);
+
+				const result = sqlite.bulk_insert(
+					database_path,
+					table,
+					data,
+					batch_size,
+				);
+
+				return create_tool_response({
+					success: true,
+					database: database_path,
+					table,
+					inserted: result.inserted,
+					batches: result.batches,
+					total_time: result.total_time,
+					message: `⚠️ DESTRUCTIVE OPERATION COMPLETED: ${result.inserted} records inserted into table '${table}' in database '${database_path}'`,
+				});
+			} catch (error) {
+				return create_tool_error_response(error);
+			}
+		},
+	);
+}

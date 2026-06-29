@@ -1,0 +1,928 @@
+# mcp-sqlite-tools
+
+A Model Context Protocol (MCP) server that provides comprehensive
+SQLite database operations for LLMs. This server enables AI assistants
+to interact with local SQLite databases safely and efficiently, with
+built-in security features, advanced transaction support, and clear
+separation between read-only and destructive operations.
+
+## Features
+
+### 🗄️ Database Management
+
+- **Open/Create Database**: Open existing databases or create new ones
+- **Close Database**: Properly close database connections
+- **List Databases**: Discover database files in directories
+- **Database Info**: Get comprehensive database metadata and
+  statistics
+
+### 📊 Table Operations
+
+- **List Tables**: View all tables and views in a database
+- **Describe Table**: Get detailed schema information for tables
+- **Create Table**: Create new tables with custom column definitions
+- **Drop Table**: Remove tables (with safety warnings)
+
+### 🔍 Query Operations
+
+- **Execute Read Query**: Safe SELECT, PRAGMA, and EXPLAIN queries
+- **Execute Write Query**: INSERT, UPDATE, DELETE operations
+- **Execute Schema Query**: DDL operations (CREATE, ALTER, DROP)
+- **Bulk Insert**: Efficient batch insertion of multiple records
+
+### 💾 Transaction Management
+
+- **Begin Transaction**: Start database transactions with savepoint
+  support
+- **Commit Transaction**: Commit changes with nested transaction
+  handling
+- **Rollback Transaction**: Safely rollback changes and nested
+  savepoints
+- **Auto-cleanup**: Automatic cleanup of stale transactions
+
+### 📋 Schema Operations
+
+- **Export Schema**: Export database schema to SQL or JSON format
+- **Import Schema**: Import and execute schema from SQL or JSON
+- **Selective Export**: Export specific tables or entire database
+  structure
+
+### 🛠️ Database Maintenance
+
+- **Backup Database**: Create database backups with timestamps
+- **Vacuum Database**: Optimize database storage and performance
+- **Connection Pooling**: Advanced connection management with health
+  monitoring
+
+## ⚠️ Security Features
+
+This server implements multiple layers of security:
+
+- **Query Classification**: Automatic separation of read-only, write,
+  schema, and transaction operations
+- **Path Validation**: Prevents directory traversal attacks
+- **Configurable Path Restrictions**: Control access to absolute paths
+- **Input Validation**: Comprehensive parameter validation using
+  Valibot
+- **Advanced Connection Pooling**: Connection limits, health
+  monitoring, and idle timeout
+- **Transaction Safety**: Automatic stale transaction cleanup and
+  nested savepoint support
+- **Resource Cleanup**: Graceful cleanup on server shutdown with
+  maintenance scheduling
+
+### Tool Separation for Hook-Based Safety
+
+The tools are intentionally separated into distinct categories to
+enable fine-grained approval control in MCP clients like Claude Code:
+
+**✓ SAFE Tools** (Read-only operations):
+
+- `execute_read_query` - SELECT, PRAGMA, EXPLAIN queries
+- `list_tables`, `describe_table`, `database_info`
+- `export_schema`, `backup_database`
+
+These tools can be auto-approved or approved once, allowing the AI to
+freely explore your database structure and read data.
+
+**⚠️ DESTRUCTIVE Tools** (Data modification):
+
+- `execute_write_query` - INSERT, UPDATE, DELETE
+- `bulk_insert` - Batch insertions
+- `import_csv` - CSV data import
+- `drop_table` - Permanent table deletion
+
+These tools should require individual approval for each operation,
+giving you visibility into what data will be modified before it
+happens.
+
+**⚠️ SCHEMA CHANGE Tools** (Structure modification):
+
+- `execute_schema_query` - CREATE, ALTER, DROP statements
+- `create_table` - Table creation
+- `import_schema` - Schema import
+- `import_csv` - Can create missing tables from CSV headers
+
+These tools modify database structure and should require individual
+approval to prevent unintended schema changes.
+
+**⚠️ FILE WRITE Tools**:
+
+- `export_csv` - Writes CSV files, including absolute paths
+
+**🔒 TRANSACTION Tools**:
+
+- `begin_transaction`, `commit_transaction`, `rollback_transaction`
+
+Can be configured based on your workflow needs.
+
+**Example Claude Code Hook Configuration:**
+
+```javascript
+// In your Claude Code hooks
+export function toolApproval(tool) {
+	// Auto-approve safe read operations
+	if (
+		tool.name.includes('read') ||
+		tool.name.includes('list') ||
+		tool.name.includes('describe') ||
+		tool.name.includes('export') ||
+		tool.name.includes('backup') ||
+		tool.name.includes('info')
+	) {
+		return 'auto-approve';
+	}
+
+	// Require approval for destructive operations
+	if (
+		tool.name.includes('write') ||
+		tool.name.includes('delete') ||
+		tool.name.includes('drop') ||
+		tool.name.includes('insert') ||
+		tool.name.includes('schema')
+	) {
+		return 'require-approval';
+	}
+
+	return 'require-approval'; // Default to safe
+}
+```
+
+This separation ensures you maintain control over destructive
+operations while allowing the AI to work efficiently with read-only
+queries.
+
+## Installation
+
+### From npm (when published)
+
+```bash
+npm install -g mcp-sqlite-tools
+```
+
+### From source
+
+```bash
+git clone <repository-url>
+cd mcp-sqlite-tools
+pnpm install
+pnpm run build
+```
+
+## Configuration
+
+### Environment Variables
+
+The server can be configured using environment variables:
+
+```bash
+# Default directory for SQLite databases (relative to project root)
+SQLITE_DEFAULT_PATH=.
+
+# Allow absolute paths for database files (security setting)
+SQLITE_ALLOW_ABSOLUTE_PATHS=true
+
+# SQLite lock busy timeout in milliseconds (not wall-clock query runtime)
+SQLITE_BUSY_TIMEOUT=30000
+
+# Default backup directory for database backups
+SQLITE_BACKUP_PATH=./backups
+
+# Enable debug logging
+DEBUG=false
+```
+
+### MCP Client Configuration
+
+#### Option 1: Global User Configuration (Recommended)
+
+Configure once in your VS Code user settings to work across all
+workspaces. Add this to your global `mcp.json` file
+(`%APPDATA%\Code\User\mcp.json` on Windows):
+
+For VS Code global configuration, edit `~/.config/Code/User/mcp.json`
+(or equivalent Windows location):
+
+```json
+{
+	"servers": {
+		"sqlite-tools": {
+			"command": "npx",
+			"args": ["-y", "mcp-sqlite-tools"]
+		}
+	}
+}
+```
+
+**For WSL users**, use this format in your global config:
+
+```json
+{
+	"servers": {
+		"sqlite-tools": {
+			"command": "wsl.exe",
+			"args": ["bash", "-c", "npx -y mcp-sqlite-tools"]
+		}
+	}
+}
+```
+
+**Benefits:**
+
+- ✅ **One configuration works everywhere** - no per-project setup
+  needed
+- 📁 **Automatically uses current workspace** - databases created in
+  whatever project you have open
+- 🔄 **Always up to date** - uses latest published version via npx
+
+#### Option 2: Workspace-Specific Configuration
+
+For teams that want to share database configuration via version
+control, create a `.vscode/mcp.json` file in your workspace:
+
+```json
+{
+	"servers": {
+		"sqlite-tools": {
+			"command": "npx",
+			"args": ["-y", "mcp-sqlite-tools"],
+			"env": {
+				"SQLITE_DEFAULT_PATH": "${workspaceFolder}/databases",
+				"SQLITE_ALLOW_ABSOLUTE_PATHS": "true",
+				"SQLITE_BACKUP_PATH": "${workspaceFolder}/backups"
+			}
+		}
+	}
+}
+```
+
+**Benefits:**
+
+- � **Team sharing** - configuration committed to version control
+- 📂 **Organized structure** - databases in dedicated `/databases`
+  folder
+- �️ **Project isolation** - each project has its own database
+  configuration
+
+#### Claude Desktop / Cline Configuration
+
+Add this to your MCP client configuration:
+
+```json
+{
+	"mcpServers": {
+		"mcp-sqlite-tools": {
+			"command": "npx",
+			"args": ["-y", "mcp-sqlite-tools"],
+			"env": {
+				"SQLITE_DEFAULT_PATH": ".",
+				"SQLITE_ALLOW_ABSOLUTE_PATHS": "true",
+				"SQLITE_BUSY_TIMEOUT": "30000",
+				"SQLITE_BACKUP_PATH": "./backups"
+			}
+		}
+	}
+}
+```
+
+### Environment Variables
+
+The following environment variables can be used to configure the MCP
+server:
+
+| Variable                      | Description                                 | Default                       | Example                        |
+| ----------------------------- | ------------------------------------------- | ----------------------------- | ------------------------------ |
+| `SQLITE_DEFAULT_PATH`         | Default directory for database files        | `.`                           | `${workspaceFolder}/databases` |
+| `SQLITE_ALLOW_ABSOLUTE_PATHS` | Allow absolute paths in database operations | `true`                        | `false`                        |
+| `SQLITE_BACKUP_PATH`          | Default directory for database backups      | Same as `SQLITE_DEFAULT_PATH` | `./backups`                    |
+| `SQLITE_BUSY_TIMEOUT`         | SQLite lock busy timeout in milliseconds    | `30000`                       | `60000`                        |
+
+`SQLITE_MAX_QUERY_TIME` is still accepted as a deprecated alias for
+`SQLITE_BUSY_TIMEOUT`; it is not a wall-clock query runtime limit.
+
+**Path Resolution:**
+
+- Relative paths are resolved from the default path
+- Use `${workspaceFolder}` in VS Code for workspace-relative paths
+- Set `SQLITE_ALLOW_ABSOLUTE_PATHS=true` to enable absolute path
+  operations
+
+#### Development Configuration
+
+For development with the MCP inspector:
+
+```bash
+pnpm run build
+pnpm run dev
+```
+
+## API Reference
+
+### Database Management Tools
+
+#### `open_database`
+
+Opens or creates a SQLite database file.
+
+**Parameters:**
+
+- `path` (string, required): Path to the database file
+- `create` (boolean, optional): Create if doesn't exist (default:
+  true)
+
+**Example:**
+
+```json
+{
+	"path": "my-app.db",
+	"create": true
+}
+```
+
+#### `close_database`
+
+Closes a database connection.
+
+**Parameters:**
+
+- `database` (string, optional): Database path to close
+
+#### `list_databases`
+
+Lists available database files in a directory.
+
+**Parameters:**
+
+- `directory` (string, optional): Directory to search
+
+#### `database_info`
+
+Gets comprehensive information about a database.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+
+### Table Operations
+
+#### `list_tables`
+
+Lists all tables and views in a database.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+
+#### `describe_table`
+
+Gets schema information for a table.
+
+**Parameters:**
+
+- `table` (string, required): Table name
+- `database` (string, optional): Database path
+- `verbosity` (string, optional): 'summary' or 'detailed' (default:
+  'detailed')
+
+**Example Request:**
+
+```json
+{
+	"table": "users",
+	"verbosity": "detailed"
+}
+```
+
+**Example Response:**
+
+```json
+{
+	"database": "/tmp/demo.db",
+	"table": "users",
+	"columns": [
+		{
+			"name": "id",
+			"type": "INTEGER",
+			"nullable": true,
+			"default_value": null,
+			"primary_key": true
+		},
+		{
+			"name": "name",
+			"type": "TEXT",
+			"nullable": false,
+			"default_value": null,
+			"primary_key": false
+		},
+		{
+			"name": "email",
+			"type": "TEXT",
+			"nullable": true,
+			"default_value": null,
+			"primary_key": false
+		},
+		{
+			"name": "created_at",
+			"type": "TIMESTAMP",
+			"nullable": true,
+			"default_value": "CURRENT_TIMESTAMP",
+			"primary_key": false
+		}
+	],
+	"verbosity": "detailed",
+	"column_count": 4
+}
+```
+
+#### `create_table`
+
+Creates a new table with specified columns.
+
+**Parameters:**
+
+- `name` (string, required): Table name
+- `columns` (array, required): Column definitions
+- `database` (string, optional): Database path
+
+**Column Definition:**
+
+```json
+{
+	"name": "column_name",
+	"type": "TEXT|INTEGER|REAL|BLOB",
+	"nullable": true,
+	"primary_key": false,
+	"default_value": null
+}
+```
+
+**Example:**
+
+```json
+{
+	"name": "users",
+	"columns": [
+		{
+			"name": "id",
+			"type": "INTEGER",
+			"primary_key": true,
+			"nullable": false
+		},
+		{
+			"name": "name",
+			"type": "TEXT",
+			"nullable": false
+		},
+		{
+			"name": "email",
+			"type": "TEXT",
+			"nullable": true
+		}
+	]
+}
+```
+
+#### `drop_table`
+
+Permanently deletes a table and all its data.
+
+**Parameters:**
+
+- `table` (string, required): Table name to delete
+- `database` (string, optional): Database path
+
+### Query Operations
+
+#### `execute_read_query`
+
+Executes read-only SQL queries (SELECT, PRAGMA, EXPLAIN).
+
+**Parameters:**
+
+- `query` (string, required): SQL query
+- `params` (object, optional): Query parameters
+- `database` (string, optional): Database path
+- `limit` (number, optional): Maximum rows to return (default: 10000)
+- `offset` (number, optional): Number of rows to skip (default: 0)
+- `verbosity` (string, optional): 'summary' or 'detailed' (default:
+  'detailed')
+
+**Example Request:**
+
+```json
+{
+	"query": "SELECT * FROM users ORDER BY id",
+	"verbosity": "detailed"
+}
+```
+
+**Example Response:**
+
+```json
+{
+	"database": "/tmp/demo.db",
+	"query": "SELECT * FROM users ORDER BY id LIMIT 10000",
+	"result": {
+		"rows": [
+			{
+				"id": 1,
+				"name": "Alice Johnson",
+				"email": "alice@example.com",
+				"created_at": "2025-10-03 09:42:04"
+			},
+			{
+				"id": 3,
+				"name": "Carol White",
+				"email": "carol@example.com",
+				"created_at": "2025-10-03 09:42:10"
+			}
+		],
+		"changes": 0,
+		"last_insert_rowid": 0
+	},
+	"row_count": 2,
+	"pagination": {
+		"limit": 10000,
+		"offset": 0,
+		"returned_count": 2,
+		"has_more": false
+	},
+	"verbosity": "detailed"
+}
+```
+
+#### `execute_write_query`
+
+Executes SQL that modifies data (INSERT, UPDATE, DELETE).
+
+**Parameters:**
+
+- `query` (string, required): SQL query
+- `params` (object, optional): Query parameters
+- `database` (string, optional): Database path
+
+**Example Request:**
+
+```json
+{
+	"query": "INSERT INTO users (name, email) VALUES ('Alice Smith', 'alice@example.com')"
+}
+```
+
+**Example Response:**
+
+```json
+{
+	"database": "/tmp/demo.db",
+	"query": "INSERT INTO users (name, email) VALUES ('Alice Smith', 'alice@example.com')",
+	"result": {
+		"rows": [],
+		"changes": 1,
+		"last_insert_rowid": 1
+	},
+	"message": "⚠️ DESTRUCTIVE OPERATION COMPLETED: Data modified in database '/tmp/demo.db'. Rows affected: 1"
+}
+```
+
+#### `execute_schema_query`
+
+Executes DDL queries (CREATE, ALTER, DROP).
+
+**Parameters:**
+
+- `query` (string, required): DDL SQL query
+- `params` (object, optional): Query parameters
+- `database` (string, optional): Database path
+
+**Example Request:**
+
+```json
+{
+	"query": "CREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  email TEXT UNIQUE,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)"
+}
+```
+
+**Example Response:**
+
+```json
+{
+	"database": "/tmp/demo.db",
+	"query": "CREATE TABLE users (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL,\n  email TEXT UNIQUE,\n  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n)",
+	"result": {
+		"rows": [],
+		"changes": 0,
+		"last_insert_rowid": 0
+	},
+	"message": "⚠️ SCHEMA CHANGE COMPLETED: Database structure modified in '/tmp/demo.db'. Changes: 0"
+}
+```
+
+#### `bulk_insert`
+
+Insert multiple records in batches.
+
+**Parameters:**
+
+- `table` (string, required): Target table name
+- `data` (array, required): Array of objects to insert
+- `batch_size` (number, optional): Records per batch (default: 1000)
+- `database` (string, optional): Database path
+
+**Example Request:**
+
+```json
+{
+	"table": "users",
+	"data": [
+		{ "name": "David Lee", "email": "david@example.com" },
+		{ "name": "Emma Davis", "email": "emma@example.com" },
+		{ "name": "Frank Miller", "email": "frank@example.com" }
+	]
+}
+```
+
+**Example Response:**
+
+```json
+{
+	"success": true,
+	"database": "/tmp/demo.db",
+	"table": "users",
+	"inserted": 3,
+	"batches": 1,
+	"total_time": 0,
+	"message": "⚠️ DESTRUCTIVE OPERATION COMPLETED: 3 records inserted into table 'users' in database '/tmp/demo.db'"
+}
+```
+
+### CSV Operations
+
+#### `import_csv`
+
+Import a headered CSV file into a table. If the table does not exist,
+it is created from CSV headers with inferred SQLite column types.
+Values are coerced by default (`""`/`null` to NULL, numbers to
+numbers, booleans to 1/0). Row-level insert errors are reported and
+successful rows continue unless `fail_fast` is true.
+
+**Parameters:**
+
+- `table` (string, required): Target table name
+- `file_path` (string, required): CSV file path; absolute paths
+  allowed
+- `database_name` (string, optional): Database path or current context
+  name
+- `create_table` (boolean, optional): Create missing table (default:
+  true)
+- `batch_size` (number, optional): Rows per batch (default: 1000)
+- `fail_fast` (boolean, optional): Stop on first row error (default:
+  false)
+- `max_errors` (number, optional): Max row errors returned
+  (default: 100)
+- `coerce_types` (boolean, optional): Coerce CSV strings (default:
+  true)
+- `delimiter`, `quote`, `escape`, `encoding` (optional): CSV parsing
+  options
+
+#### `export_csv`
+
+Export either a full table or a read-only query result to CSV. Provide
+exactly one of `table` or `query`.
+
+**Parameters:**
+
+- `file_path` (string, required): Output CSV path; absolute paths
+  allowed
+- `table` (string, optional): Table to export
+- `query` (string, optional): Read-only query to export
+- `database_name` (string, optional): Database path or current context
+  name
+- `delimiter`, `record_delimiter`, `encoding` (optional): CSV output
+  options
+- `always_quote` (boolean, optional): Quote every field (default:
+  false)
+- `append` (boolean, optional): Append to existing file (default:
+  false)
+
+### Transaction Management
+
+#### `begin_transaction`
+
+Start a database transaction with optional savepoint support.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+
+**Returns:** Transaction ID for tracking
+
+#### `commit_transaction`
+
+Commit the current transaction or release a savepoint.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+
+#### `rollback_transaction`
+
+Rollback the current transaction or revert to a savepoint.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+
+### Schema Operations
+
+#### `export_schema`
+
+Export database schema to SQL or JSON format.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+- `format` (string, optional): Output format - "sql" or "json"
+  (default: "sql")
+- `tables` (array, optional): Specific tables to export
+
+**Example:**
+
+```json
+{
+	"format": "json",
+	"tables": ["users", "orders"]
+}
+```
+
+#### `import_schema`
+
+Import and execute schema from SQL or JSON.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+- `schema` (string, required): Schema content to import
+- `format` (string, optional): Input format - "sql" or "json"
+  (default: "sql")
+
+### Database Maintenance
+
+#### `backup_database`
+
+Creates a consistent SQLite backup using SQLite's online backup API,
+including committed data that may still be in WAL files.
+
+**Parameters:**
+
+- `source_database` (string, optional): Source database path
+- `backup_path` (string, optional): Backup file path (auto-generated
+  if not provided)
+
+#### `vacuum_database`
+
+Optimizes database storage by reclaiming unused space.
+
+**Parameters:**
+
+- `database` (string, optional): Database path
+
+## Safety Guidelines
+
+### Tool Classification
+
+The server automatically classifies tools into safety categories:
+
+1. **✓ SAFE**: Read-only operations (SELECT, PRAGMA, EXPLAIN, database
+   info, backups)
+2. **⚠️ DESTRUCTIVE**: Data modification (INSERT, UPDATE, DELETE, bulk
+   insert, CSV import)
+3. **⚠️ SCHEMA CHANGE**: Structure modification (CREATE, ALTER, DROP,
+   schema import, CSV table creation)
+4. **⚠️ FILE WRITE**: Export operations that write files, including
+   absolute CSV paths
+5. **⚠️ TRANSACTION**: Transaction control (BEGIN, COMMIT, ROLLBACK)
+6. **✓ MAINTENANCE**: Optimization operations (VACUUM, connection
+   management)
+
+### Best Practices
+
+1. **Always use parameterized queries** to prevent SQL injection
+2. **Use transactions** for multi-step operations to ensure data
+   consistency
+3. **Review destructive operations** before execution
+4. **Create backups** before major schema changes
+5. **Use bulk_insert** for inserting large datasets efficiently
+6. **Review CSV absolute paths** before import/export file operations
+7. **Export schemas** before major structural changes
+8. **Use appropriate tools** for different operation types
+9. **Monitor connection pool** usage in high-traffic scenarios
+
+## Development
+
+### Building
+
+```bash
+pnpm run build
+```
+
+### Development Mode
+
+```bash
+pnpm run dev
+```
+
+### Cleaning
+
+```bash
+pnpm run clean
+```
+
+## Architecture
+
+The server is built with a modular architecture:
+
+### Core Modules
+
+- **`src/index.ts`**: Main server entry point
+- **`src/config.ts`**: Configuration management with Valibot
+  validation
+
+### Database Clients
+
+- **`src/clients/connection-manager.ts`**: Advanced connection pooling
+  with health monitoring
+- **`src/clients/query-executor.ts`**: SQL execution, bulk operations,
+  and query utilities
+- **`src/clients/transaction-manager.ts`**: ACID transaction
+  management with savepoints
+- **`src/clients/schema-manager.ts`**: Schema export/import
+  functionality
+- **`src/clients/sqlite.ts`**: Main SQLite client interface and
+  utilities
+
+### Tool Handlers
+
+- **`src/tools/handler.ts`**: Tool registration orchestrator
+- **`src/tools/admin-tools.ts`**: Database and table management tools
+- **`src/tools/query-tools.ts`**: Query execution and bulk operation
+  tools
+- **`src/tools/transaction-tools.ts`**: Transaction management tools
+- **`src/tools/schema-tools.ts`**: Schema export/import tools
+- **`src/tools/csv-tools.ts`**: CSV import/export tools
+- **`src/tools/context.ts`**: Database context management
+
+### Common Utilities
+
+- **`src/common/types.ts`**: TypeScript type definitions
+- **`src/common/errors.ts`**: Error handling utilities
+- **`src/common/sql.ts`**: SQL identifier and literal helpers
+- **`src/common/schema-sql.ts`**: SQLite schema statement parsing
+
+This modular design provides:
+
+- **Separation of Concerns**: Each module has a single responsibility
+- **Maintainability**: Easy to test, debug, and extend individual
+  components
+- **Scalability**: New features can be added without affecting
+  existing code
+- **Type Safety**: Comprehensive TypeScript coverage throughout
+
+## Dependencies
+
+- **[tmcp](https://github.com/paoloricciuti/tmcp)**: Modern TypeScript
+  MCP framework
+- **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3)**:
+  High-performance SQLite driver
+- **[valibot](https://valibot.dev/)**: Lightweight validation library
+  for type-safe inputs
+- **[csv-parser](https://github.com/mafintosh/csv-parser)**: CSV
+  import parsing
+- **[csv-writer](https://github.com/ryu1kn/csv-writer)**: CSV export
+  writing
+
+### Key Features Provided by Dependencies
+
+- **tmcp**: Streamlined MCP server development with excellent
+  TypeScript support
+- **better-sqlite3**: Synchronous SQLite operations with superior
+  performance
+- **valibot**: Runtime type validation for all tool parameters
+- **csv-\***: Headered CSV import/export with type coercion and
+  row-level import error reporting
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built on the
+  [Model Context Protocol](https://github.com/modelcontextprotocol)
+- Inspired by
+  [mcp-turso-cloud](https://github.com/spences10/mcp-turso-cloud)
+- Uses [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
+  for high-performance SQLite operations

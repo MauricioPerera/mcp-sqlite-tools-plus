@@ -1,0 +1,22 @@
+{
+	"$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+	"name": "io.github.mauricioperera/mcp-sqlite-tools-plus",
+	"description": "MCP server for local SQLite: CRUD, schema, relations, generated columns, and multi-format import/export (CSV, JSON, XLSX). Fork of mcp-sqlite-tools.",
+	"status": "active",
+	"repository": {
+		"url": "https://github.com/MauricioPerera/mcp-sqlite-tools-plus",
+		"source": "github"
+	},
+	"version": "0.1.0",
+	"packages": [
+		{
+			"registry_type": "npm",
+			"registry_base_url": "https://registry.npmjs.org",
+			"identifier": "mcp-sqlite-tools-plus",
+			"version": "0.1.0",
+			"transport": {
+				"type": "stdio"
+			}
+		}
+	]
+}

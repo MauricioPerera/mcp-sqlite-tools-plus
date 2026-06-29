@@ -1,0 +1,146 @@
+/**
+ * Common type definitions for the SQLite Tools MCP server
+ */
+
+// SQLite query result types
+export interface QueryResult {
+	rows: Record<string, any>[];
+	changes: number;
+	last_insert_rowid: number | bigint;
+}
+
+// Table column information
+export interface ColumnInfo {
+	cid: number;
+	name: string;
+	type: string;
+	notnull: number;
+	dflt_value: any;
+	pk: number;
+}
+
+// Table information
+export interface TableInfo {
+	name: string;
+	type: string;
+	sql: string;
+}
+
+// Database information
+export interface DatabaseInfo {
+	path: string;
+	size: number;
+	tables: number;
+	page_size: number;
+	page_count: number;
+	encoding: string;
+	user_version: number;
+}
+
+// Backup information
+export interface BackupInfo {
+	source: string;
+	destination: string;
+	timestamp: string;
+	size: number;
+}
+
+// CSV import/export options
+export interface CsvOptions {
+	delimiter?: string;
+	quote?: string;
+	escape?: string;
+	encoding?: string;
+}
+
+// Query execution context
+export interface QueryContext {
+	database?: string;
+	timeout?: number;
+	readonly?: boolean;
+}
+
+// Tool input schemas (for Valibot validation)
+export interface OpenDatabaseInput {
+	path: string;
+}
+
+export interface CreateDatabaseInput {
+	path: string;
+}
+
+export interface ExecuteQueryInput {
+	query: string;
+	params?: Record<string, any>;
+	database?: string;
+}
+
+export interface CreateTableInput {
+	name: string;
+	columns: Array<{
+		name: string;
+		type: string;
+		nullable?: boolean;
+		primary_key?: boolean;
+		default_value?: any;
+	}>;
+	database?: string;
+}
+
+export interface DescribeTableInput {
+	table: string;
+	database?: string;
+}
+
+export interface ImportCsvInput {
+	table: string;
+	file_path: string;
+	database_name?: string;
+	create_table?: boolean;
+	batch_size?: number;
+	fail_fast?: boolean;
+	max_errors?: number;
+	coerce_types?: boolean;
+	options?: CsvOptions;
+}
+
+export interface ExportCsvInput {
+	file_path: string;
+	table?: string;
+	query?: string;
+	database_name?: string;
+	always_quote?: boolean;
+	append?: boolean;
+	options?: CsvOptions & { record_delimiter?: string };
+}
+
+export interface BackupDatabaseInput {
+	source_database?: string;
+	backup_path?: string;
+}
+
+// Error types
+export type SqliteErrorCode =
+	| 'SQLITE_ERROR'
+	| 'SQLITE_BUSY'
+	| 'SQLITE_LOCKED'
+	| 'SQLITE_NOMEM'
+	| 'SQLITE_READONLY'
+	| 'SQLITE_INTERRUPT'
+	| 'SQLITE_IOERR'
+	| 'SQLITE_CORRUPT'
+	| 'SQLITE_NOTFOUND'
+	| 'SQLITE_FULL'
+	| 'SQLITE_CANTOPEN'
+	| 'SQLITE_PROTOCOL'
+	| 'SQLITE_EMPTY'
+	| 'SQLITE_SCHEMA'
+	| 'SQLITE_TOOBIG'
+	| 'SQLITE_CONSTRAINT'
+	| 'SQLITE_MISMATCH'
+	| 'SQLITE_MISUSE'
+	| 'SQLITE_NOLFS'
+	| 'SQLITE_AUTH'
+	| 'SQLITE_FORMAT'
+	| 'SQLITE_RANGE'
+	| 'SQLITE_NOTADB';
