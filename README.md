@@ -132,6 +132,55 @@ every connection and are not configurable via env.
 
 ---
 
+## Remote access (HTTP transport)
+
+By default the server uses **stdio** (local subprocess). It can also run as a
+**remote MCP server over HTTP** (Streamable HTTP transport), so a remote agent can
+reach a database that lives on another machine.
+
+Set `MCP_TRANSPORT=http`. A bearer token is **required** in this mode — the server
+refuses to start without `MCP_AUTH_TOKEN`.
+
+```bash
+MCP_TRANSPORT=http \
+MCP_AUTH_TOKEN="a-long-random-secret" \
+MCP_HTTP_HOST=127.0.0.1 \
+MCP_HTTP_PORT=3000 \
+SQLITE_DEFAULT_PATH=/absolute/path/to/your/databases \
+SQLITE_ALLOW_ABSOLUTE_PATHS=false \
+npx -y mcp-sqlite-tools-plus
+```
+
+The MCP endpoint is then `http://<host>:<port>/mcp`. Every request must send
+`Authorization: Bearer <MCP_AUTH_TOKEN>`; requests without it receive `401`.
+
+### HTTP environment variables
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MCP_TRANSPORT` | `stdio` | Set to `http` to enable the HTTP transport. |
+| `MCP_AUTH_TOKEN` | — | **Required** in HTTP mode. Shared bearer token; the server exits if it is missing. |
+| `MCP_HTTP_HOST` | `127.0.0.1` | Bind address. Loopback by default on purpose. Set to `0.0.0.0` only behind a proxy/firewall you control. |
+| `MCP_HTTP_PORT` | `3000` | Listen port. |
+| `MCP_HTTP_PATH` | `/mcp` | Endpoint path. |
+
+### Security — read before exposing it
+
+This server performs full CRUD and writes files. Exposing it to a network without
+protection lets anyone read or destroy your data. Before going remote:
+
+1. **Keep the token secret and long.** Anyone with it has full access.
+2. **Terminate TLS** in front of the server (reverse proxy, or a tunnel such as
+   Cloudflare Tunnel / `ssh -L`). The built-in server speaks plain HTTP.
+3. **Do not bind to `0.0.0.0` on a public host** without a firewall/VPN/tunnel
+   limiting who can reach the port.
+4. **Keep `SQLITE_ALLOW_ABSOLUTE_PATHS=false`** and a dedicated `SQLITE_DEFAULT_PATH`.
+
+The bearer token is authentication, not transport security — pair it with TLS and
+network restrictions.
+
+---
+
 ## Tool catalogue (26 tools)
 
 Legend: ✓ read-only · ⚠️ writes data/schema/files.

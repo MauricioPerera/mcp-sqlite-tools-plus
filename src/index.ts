@@ -14,6 +14,10 @@ import {
 import { close_all_databases } from './clients/sqlite.js';
 import { get_config } from './config.js';
 import { register_tools } from './tools/handler.js';
+import {
+	read_http_config,
+	start_http_transport,
+} from './transport/http-transport.js';
 
 // Get package info for server metadata
 const __filename = fileURLToPath(import.meta.url);
@@ -111,7 +115,19 @@ class SqliteToolsServer {
 			// Initialize the server
 			await this.initialize();
 
-			// Setup transport
+			// Setup transport. stdio by default; HTTP when MCP_TRANSPORT=http.
+			if (process.env.MCP_TRANSPORT === 'http') {
+				const http_config = read_http_config(process.env);
+				if (!http_config.token) {
+					console.error(
+						'MCP_AUTH_TOKEN is required when MCP_TRANSPORT=http',
+					);
+					process.exit(1);
+				}
+				start_http_transport(this.server, http_config);
+				return;
+			}
+
 			const transport = new StdioTransport(this.server);
 			transport.listen();
 

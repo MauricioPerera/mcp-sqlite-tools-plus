@@ -1,5 +1,16 @@
 # mcp-sqlite-tools-plus
 
+## 0.2.0
+
+### Minor Changes
+
+- Add optional HTTP transport for remote access (`MCP_TRANSPORT=http`), built on
+  `@tmcp/transport-http`. stdio remains the default and is unchanged.
+- Bearer-token authentication: `MCP_AUTH_TOKEN` is required in HTTP mode; requests
+  without a matching `Authorization: Bearer <token>` header get HTTP 401.
+- Safe defaults: binds to `127.0.0.1` unless `MCP_HTTP_HOST` is set; configurable
+  `MCP_HTTP_PORT` (3000) and `MCP_HTTP_PATH` (`/mcp`).
+
 ## 0.1.0
 
 Fork of `mcp-sqlite-tools` by Scott Spence.

@@ -1,6 +1,6 @@
 {
 	"name": "mcp-sqlite-tools-plus",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "MCP server for local SQLite: CRUD, schema, relations, generated columns, and multi-format import/export (CSV, JSON, XLSX). Fork of mcp-sqlite-tools.",
 	"keywords": [
 		"ai",
@@ -59,7 +59,9 @@
 		"sync-server-json": "node -e \"const pkg = require('./package.json'); const server = require('./server.json'); server.version = pkg.version; server.packages[0].version = pkg.version; require('fs').writeFileSync('./server.json', JSON.stringify(server, null, 2));\""
 	},
 	"dependencies": {
+		"@remix-run/node-fetch-server": "^0.13.3",
 		"@tmcp/adapter-valibot": "^0.1.6",
+		"@tmcp/transport-http": "^0.8.6",
 		"@tmcp/transport-stdio": "^0.4.3",
 		"better-sqlite3": "^12.10.0",
 		"csv-parser": "^3.2.1",

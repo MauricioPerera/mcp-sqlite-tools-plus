@@ -8,9 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@remix-run/node-fetch-server':
+        specifier: ^0.13.3
+        version: 0.13.3
       '@tmcp/adapter-valibot':
         specifier: ^0.1.6
         version: 0.1.6(tmcp@1.19.4)(valibot@1.4.1)
+      '@tmcp/transport-http':
+        specifier: ^0.8.6
+        version: 0.8.6(tmcp@1.19.4)
       '@tmcp/transport-stdio':
         specifier: ^0.4.3
         version: 0.4.3(tmcp@1.19.4)
@@ -452,6 +458,9 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
+  '@remix-run/node-fetch-server@0.13.3':
+    resolution: {integrity: sha512-UfjOXed/DQteaM5VyTfqTeGpHwyL2J5aoRGY6cydip4tt1ehNNeSwuXCC7AEGE0RWBs/7bgKxYkL/B/+UDe4AA==}
+
   '@rolldown/binding-android-arm64@1.0.0-rc.17':
     resolution: {integrity: sha512-s70pVGhw4zqGeFnXWvAzJDlvxhlRollagdCCKRgOsgUOH3N1l0LIxf83AtGzmb5SiVM4Hjl5HyarMRfdfj3DaQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -558,6 +567,20 @@ packages:
     peerDependencies:
       tmcp: ^1.17.0
       valibot: ^1.1.0
+
+  '@tmcp/session-manager@0.2.2':
+    resolution: {integrity: sha512-UrCRpTsxh5XnMbplspvftEYboiZWgAiXqqAUbyFTHoHMJ0LoNDy8bQd0+7qtxtT4S5Qsnv650gvs/Nbec5NTCQ==}
+    peerDependencies:
+      tmcp: ^1.16.3
+
+  '@tmcp/transport-http@0.8.6':
+    resolution: {integrity: sha512-iLcxu+tEMbkVHbhFfyXQhxfPDDTfm+F0kEw8Xg/a1rm29s4cBg1vwcpbtk02XTxsdDh8RJ1AZkQwF9WDGeb/IA==}
+    peerDependencies:
+      '@tmcp/auth': ^0.3.3 || ^0.4.0
+      tmcp: ^1.18.0
+    peerDependenciesMeta:
+      '@tmcp/auth':
+        optional: true
 
   '@tmcp/transport-stdio@0.4.3':
     resolution: {integrity: sha512-chdmSwk7PSXjkaQId2OAY8ZMFrTFWwckfCyXJuw6b6WFK9IMK95EoU2VDFioybcmawuQox0MNPM5R2DVxlptoA==}
@@ -944,6 +967,9 @@ packages:
 
   es-module-lexer@2.1.0:
     resolution: {integrity: sha512-n27zTYMjYu1aj4MjCWzSP7G9r75utsaoc8m61weK+W8JMBGGQybd43GstCXZ3WNmSFtGT9wi59qQTW6mhTR5LQ==}
+
+  esm-env@1.2.2:
+    resolution: {integrity: sha512-Epxrv+Nr/CaL4ZcFGPJIYLWFom+YeV1DqMLHJoEd9SYRxNbaFruBwfEX/kkHUJf55j2+TUbmDcmuilbP1TmXHA==}
 
   esprima@4.0.1:
     resolution: {integrity: sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A==}
@@ -2137,6 +2163,8 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
+  '@remix-run/node-fetch-server@0.13.3': {}
+
   '@rolldown/binding-android-arm64@1.0.0-rc.17':
     optional: true
 
@@ -2196,6 +2224,16 @@ snapshots:
       '@valibot/to-json-schema': 1.7.0(valibot@1.4.1)
       tmcp: 1.19.4
       valibot: 1.4.1
+
+  '@tmcp/session-manager@0.2.2(tmcp@1.19.4)':
+    dependencies:
+      tmcp: 1.19.4
+
+  '@tmcp/transport-http@0.8.6(tmcp@1.19.4)':
+    dependencies:
+      '@tmcp/session-manager': 0.2.2(tmcp@1.19.4)
+      esm-env: 1.2.2
+      tmcp: 1.19.4
 
   '@tmcp/transport-stdio@0.4.3(tmcp@1.19.4)':
     dependencies:
@@ -2526,6 +2564,8 @@ snapshots:
   es-module-lexer@1.7.0: {}
 
   es-module-lexer@2.1.0: {}
+
+  esm-env@1.2.2: {}
 
   esprima@4.0.1: {}
 
